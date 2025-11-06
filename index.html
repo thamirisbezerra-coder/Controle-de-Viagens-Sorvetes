@@ -928,8 +928,20 @@
 
         async function setupFirebase() {
             try {
-                // setLogLevel('Debug');
+                setLogLevel('Debug'); // Descomentado para ajudar na depuração
+
+                // --- CORREÇÃO ---
+                // Verifica se a configuração do Firebase está presente
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    console.error("Erro: __firebase_config não está definida ou está vazia.");
+                    authStatus.textContent = 'Falha: Configuração não encontrada.';
+                    authStatus.classList.add('text-red-600');
+                    return; // Interrompe a execução
+                }
+                
                 const firebaseConfig = JSON.parse(__firebase_config);
+                // --- FIM DA CORREÇÃO ---
+
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
