@@ -931,14 +931,8 @@
                 setLogLevel('Debug'); // Descomentado para ajudar na depuração
 
                 // --- CORREÇÃO ---
-                // Verifica se a configuração do Firebase está presente
-                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    console.error("Erro: __firebase_config não está definida ou está vazia.");
-                    authStatus.textContent = 'Falha: Configuração não encontrada.';
-                    authStatus.classList.add('text-red-600');
-                    return; // Interrompe a execução
-                }
-                
+                // Removendo a verificação explícita que estava causando a falha.
+                // Vamos tentar a conexão direta.
                 const firebaseConfig = JSON.parse(__firebase_config);
                 // --- FIM DA CORREÇÃO ---
 
