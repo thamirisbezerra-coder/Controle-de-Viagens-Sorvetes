@@ -52,11 +52,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Fundo limpo, sem ícones */
-        body.bg-background {
-            background-color: #F9FAFB;
-        }
-
         /* Estilos do Calendário */
         .calendar-grid {
             display: grid;
@@ -65,22 +60,19 @@
         }
 
         .calendar-day {
-            min-height: 120px; /* Aumentado de 110px para 120px para caber os nomes */
+            min-height: 120px; /* Aumentado para caber nome/cliente */
             padding: 8px;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease-in-out;
             border: 1px solid #E5E7EB; /* Borda suave */
             background-color: #FFFFFF;
+            overflow: hidden; /* Evita que o conteúdo vaze */
         }
 
         .calendar-day:hover:not(.empty-day) {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        }
-
-        .calendar-day.has-assignments {
-            background-color: #E3F2FD; /* Azul bem claro */
         }
 
         .calendar-day.today {
@@ -93,13 +85,24 @@
             cursor: default;
         }
         
-            /* O indicador de ponto (•) - NÃO MAIS USADO, MAS MANTIDO PARA REFERÊNCIA */
-        .assignment-indicator {
-            width: 8px;
-            height: 8px;
-            background-color: #0D47A1; /* brand-blue */
-            border-radius: 50%;
-            display: inline-block;
+        /* Crachá de agendamento no calendário */
+        .assignment-badge {
+            font-size: 0.8rem;
+            padding: 2px 6px;
+            border-radius: 6px;
+            margin-bottom: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border: 1px solid;
+        }
+
+        /* Estilo para agendamento cancelado */
+        .assignment-badge.cancelled {
+            background-color: #FEE2E2; /* Fundo vermelho claro */
+            border-color: #FCA5A5;
+            color: #B91C1C; /* Texto vermelho escuro */
+            text-decoration: line-through;
         }
 
         .modal-overlay {
@@ -119,25 +122,41 @@
             transform: scale(0.95) translateY(20px);
         }
 
-        /* NOVO: Estilo para o Toast de Notificação */
-        #toast {
+        /* Toast de Notificação */
+        #notification-toast {
             position: fixed;
-            top: 1.25rem;
-            right: 1.25rem;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-weight: 500;
             z-index: 100;
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            transform: translateX(100%);
+            transition: all 0.3s ease-in-out;
             opacity: 0;
+            transform: translateY(-20px);
         }
-
-        #toast.show {
-            transform: translateX(0);
+        #notification-toast.show {
             opacity: 1;
+            transform: translateY(0);
+        }
+        #notification-toast.success {
+            background-color: #D1FAE5; /* Verde menta */
+            color: #065F46;
+            border: 1px solid #6EE7B7;
+        }
+        #notification-toast.error {
+            background-color: #FEE2E2; /* Vermelho suave */
+            color: #991B1B;
+            border: 1px solid #FCA5A5;
         }
     </style>
 </head>
 
 <body class="bg-background font-sans text-text-dark">
+
+    <!-- Notificação Toast (inicialmente oculta) -->
+    <div id="notification-toast"></div>
 
     <!-- Container Principal -->
     <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -155,53 +174,53 @@
                 Adicionar Agendamento
             </button>
         </header>
-
-        <!-- NOVO: Bloco de Orientações -->
-        <div class="bg-card-bg p-5 rounded-lg shadow-md border border-border-color mb-6 text-text-dark">
-            <div class="flex items-center gap-3">
-                <svg class="h-6 w-6 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <h3 class="text-xl font-semibold text-brand-blue">Intuito e Orientações</h3>
-            </div>
-            <p class="mt-3 text-sm text-text-light">
-                <strong>Intuito:</strong> Este calendário centraliza a agenda dos técnicos, permitindo o gerenciamento em tempo real de visitas, viagens e status dos clientes.
+        
+        <!-- Bloco de Orientações -->
+        <div class="bg-card-bg p-5 rounded-lg shadow-md mb-6 border border-border-color">
+            <h3 class="text-xl font-semibold text-text-dark mb-2">Bem-vindo ao Controle de Técnicos!</h3>
+            <p class="text-text-light mb-3">
+                <strong>Intuito:</strong> Esta ferramenta centraliza a agenda de todos os técnicos, permitindo que a equipe (incluindo o Vinicius) saiba onde cada um está, qual cliente está atendendo e o status da visita em tempo real.
             </p>
-            <p class="mt-2 text-sm text-text-light">
-                <strong>Orientações:</strong>
-                <ul class="list-disc list-inside ml-1 mt-1">
-                    <li>Use o botão <span class="font-semibold text-brand-blue">"+ Adicionar Agendamento"</span> para criar um novo evento.</li>
-                    <li>Clique em um dia no calendário para ver os detalhes.</li>
-                    <li>No modal de detalhes, você pode <span class="font-semibold text-yellow-600">Editar</span>, <span class="font-semibold text-red-600">Excluir</span> ou <span class="font-semibold text-gray-600">Cancelar/Reativar</span> um agendamento.</li>
-                </ul>
-            </p>
+            <h4 class="font-semibold text-text-dark mb-1">Orientações de Preenchimento:</h4>
+            <ul class="list-disc list-inside text-text-light text-sm space-y-1">
+                <li><strong>Adicionar:</strong> Clique no botão "Adicionar Agendamento" e preencha todos os campos.</li>
+                <li><strong>Editar:</strong> Clique em um dia do calendário, localize o agendamento no modal e clique em "Editar".</li>
+                <li><strong>Cancelar:</strong> Para cancelar um agendamento, clique no dia, encontre o agendamento e use o botão "Marcar como Cancelado".</li>
+            </ul>
         </div>
+        
+        <!-- Blocos de Resumo -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Resumo do Mês -->
+            <div class="bg-card-bg p-5 rounded-lg shadow-md border border-border-color">
+                <h3 class="text-xl font-semibold text-text-dark mb-3">Resumo do Mês</h3>
+                <div id="month-summary-loader" class="text-center text-text-light">Calculando...</div>
+                <div id="month-summary" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-lg text-center border border-border-color">
+                        <span class="block text-sm text-text-light">Total de Agendamentos</span>
+                        <span id="summary-total" class="text-2xl font-bold text-brand-blue">0</span>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg text-center border border-border-color">
+                        <span class="block text-sm text-text-light">Total de Viagens ✈️</span>
+                        <span id="summary-travel" class="text-2xl font-bold text-brand-blue">0</span>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg text-center border border-border-color">
+                        <span class="block text-sm text-text-light">Técnico do Mês</span>
+                        <span id="summary-top-tech" class="text-2xl font-bold text-brand-blue">N/A</span>
+                    </div>
+                </div>
+            </div>
 
-        <!-- NOVO: Resumo do Mês -->
-        <div id="summary-dashboard" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-card-bg p-4 rounded-lg shadow-md border border-border-color text-center">
-                <h4 class="text-sm font-semibold text-text-light">Agendamentos no Mês</h4>
-                <p class="text-3xl font-bold text-brand-blue" id="summary-total">0</p>
-            </div>
-            <div class="bg-card-bg p-4 rounded-lg shadow-md border border-border-color text-center">
-                <h4 class="text-sm font-semibold text-text-light">Viagens ✈️</h4>
-                <p class="text-3xl font-bold text-brand-blue" id="summary-travels">0</p>
-            </div>
-            <div class="bg-card-bg p-4 rounded-lg shadow-md border border-border-color text-center">
-                <h4 class="text-sm font-semibold text-text-light">Técnico do Mês</h4>
-                <p class="text-2xl font-bold text-brand-blue truncate" id="summary-mvp">N/A</p>
+            <!-- Próximos Agendamentos -->
+            <div class="bg-card-bg p-5 rounded-lg shadow-md border border-border-color">
+                <h3 class="text-xl font-semibold text-text-dark mb-3">Próximos Agendamentos</h3>
+                <div id="upcoming-loader" class="text-center text-text-light">Buscando...</div>
+                <div id="upcoming-list" class="space-y-2 text-sm">
+                    <!-- Agendamentos futuros serão inseridos aqui -->
+                    <p class="text-text-light italic">Nenhum agendamento futuro encontrado.</p>
+                </div>
             </div>
         </div>
-
-        <!-- NOVO: Próximos Agendamentos (Contagem Regressiva) -->
-        <div class="bg-card-bg p-5 rounded-lg shadow-md border border-border-color mb-6">
-            <div class="flex items-center gap-3 mb-4">
-                <svg class="h-6 w-6 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                <h3 class="text-xl font-semibold text-brand-blue">Próximos Agendamentos</h3>
-            </div>
-            <div id="upcoming-events-list" class="space-y-3 max-h-48 overflow-y-auto">
-                <p class="text-text-light italic" id="upcoming-placeholder">Carregando próximos agendamentos...</p>
-            </div>
-        </div>
-
 
         <!-- Seção do Calendário -->
         <div class="bg-card-bg p-4 sm:p-6 rounded-lg shadow-xl mb-8 border border-border-color">
@@ -317,7 +336,7 @@
         </div>
     </div>
 
-    <!-- Modal: Detalhes do Dia (CORRIGIDO - HTML estava faltando) -->
+    <!-- Modal: Detalhes do Dia -->
     <div id="day-details-modal" class="fixed inset-0 z-50 overflow-y-auto hidden modal">
         <div class="flex items-center justify-center min-h-screen p-4">
             <!-- Overlay -->
@@ -331,26 +350,18 @@
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
-                
-                <!-- Lista de Agendamentos -->
-                <div id="modal-assignments-list">
-                    <!-- Agendamentos serão injetados aqui pelo JS -->
-                    <p class="text-text-light italic">Carregando detalhes...</p>
+                <div id="modal-assignments-list" class="space-y-3">
+                    <p class="text-text-light italic">Nenhum agendamento para esta data.</p>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- NOVO: Toast de Notificação -->
-    <div id="toast" class="bg-green-500 text-white py-2 px-4 rounded-lg shadow-md">
-        <span id="toast-message">Mensagem</span>
     </div>
 
 
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Variáveis Globais ---
@@ -360,21 +371,22 @@
         let allAssignments = [];
         let currentEditId = null;
         let currentCalendarDate = new Date();
-        let techColorMap = new Map(); // Mapa para as cores dos técnicos
+        let technicianColors = {}; // Cache de cores por técnico
+        let colorIndex = 0; // Índice para rotação de cores
 
-        // Paleta de cores para os técnicos
-        const techColors = [
-            { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
-            { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
-            { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
-            { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
-            { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
-            { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
-            { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300' },
+        // CAMINHO DA COLEÇÃO - Simplificado para o novo projeto
+        const assignmentsColPath = "assignments";
+
+        // Paleta de cores para os técnicos (tons profissionais e suaves)
+        const COLOR_PALETTE = [
+            { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-800' },
+            { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800' },
+            { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-800' },
+            { bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-800' },
+            { bg: 'bg-pink-100', border: 'border-pink-300', text: 'text-pink-800' },
+            { bg: 'bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-800' },
+            { bg: 'bg-teal-100', border: 'border-teal-300', text: 'text-teal-800' },
         ];
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const assignmentsColPath = `/artifacts/${appId}/public/data/assignments`;
 
         // --- Elementos da DOM ---
         const authStatus = document.getElementById('auth-status');
@@ -385,11 +397,6 @@
         const prevMonthButton = document.getElementById('prev-month');
         const nextMonthButton = document.getElementById('next-month');
 
-        // Dashboard
-        const summaryTotal = document.getElementById('summary-total');
-        const summaryTravels = document.getElementById('summary-travels');
-        const summaryMvp = document.getElementById('summary-mvp');
-
         // Modal de Formulário
         const formModal = document.getElementById('form-modal');
         const openAddModalButton = document.getElementById('open-add-modal');
@@ -399,8 +406,6 @@
         const formTitle = document.getElementById('form-title');
         const saveButton = document.getElementById('save-button');
         const cancelEditButton = document.getElementById('cancel-edit-button');
-        const dateStartInput = document.getElementById('dateStart');
-        const dateEndInput = document.getElementById('dateEnd');
 
         // Modal de Detalhes
         const dayDetailsModal = document.getElementById('day-details-modal');
@@ -408,32 +413,36 @@
         const modalAssignmentsList = document.getElementById('modal-assignments-list');
         const closeDetailsModalButton = document.getElementById('close-details-modal');
         const detailsModalOverlay = document.getElementById('details-modal-overlay');
+        
+        // Notificação
+        const notificationToast = document.getElementById('notification-toast');
+        
+        // Resumo do Mês
+        const monthSummaryLoader = document.getElementById('month-summary-loader');
+        const monthSummary = document.getElementById('month-summary');
+        const summaryTotal = document.getElementById('summary-total');
+        const summaryTravel = document.getElementById('summary-travel');
+        const summaryTopTech = document.getElementById('summary-top-tech');
 
-        // NOVO: Toast
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toast-message');
-        let toastTimeout;
+        // Próximos Agendamentos
+        const upcomingLoader = document.getElementById('upcoming-loader');
+        const upcomingList = document.getElementById('upcoming-list');
 
         // --- Funções Auxiliares ---
 
-        /** NOVO: Exibe uma notificação toast */
-        function showToast(message, isError = false) {
-            toastMessage.textContent = message;
+        /**
+         * Mostra uma notificação (toast)
+         * @param {string} message - A mensagem a ser exibida
+         * @param {string} type - 'success' ou 'error'
+         */
+        function showToast(message, type = 'success') {
+            notificationToast.textContent = message;
+            notificationToast.className = type === 'success' ? 'success' : 'error';
+            notificationToast.classList.add('show');
             
-            // Limpa timeout anterior
-            if (toastTimeout) clearTimeout(toastTimeout);
-            
-            // Define cor
-            toast.classList.toggle('bg-red-500', isError);
-            toast.classList.toggle('bg-green-500', !isError);
-
-            // Mostra o toast
-            toast.classList.add('show');
-
-            // Esconde após 3 segundos
-            toastTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
+            setTimeout(() => {
+                notificationToast.classList.remove('show');
+            }, 3000); // Esconde após 3 segundos
         }
 
         function getTodayDateString() {
@@ -443,57 +452,50 @@
             const day = String(today.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
-
-        /** NOVO: Calcula os dias restantes para uma data */
-        function getDaysLeft(dateString) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Zera a hora para comparar apenas datas
-            
-            // Garante que a data do evento também não tenha fuso horário
-            const [year, month, day] = dateString.split('-');
-            const eventDate = new Date(year, month - 1, day); 
-            eventDate.setHours(0, 0, 0, 0);
-
-            const diffTime = eventDate - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            return diffDays;
-        }
-
+        
         function formatDisplayDate(dateString) {
             const [year, month, day] = dateString.split('-');
             return `${day}/${month}/${year}`;
+        }
+        
+        /**
+         * Calcula a diferença de dias entre duas datas
+         * @param {string} dateStr1 - Data inicial (YYYY-MM-DD)
+         * @param {string} dateStr2 - Data final (YYYY-MM-DD)
+         */
+        function dateDiffInDays(dateStr1, dateStr2) {
+            const dt1 = new Date(dateStr1 + 'T00:00:00');
+            const dt2 = new Date(dateStr2 + 'T00:00:00');
+            const diffTime = Math.abs(dt2 - dt1);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         }
 
         // Retorna info de status (incluindo ícone SVG)
         function getStatusInfo(status) {
             switch (status) {
                 case 'Agendado':
-                    return {
-                        badgeClass: 'bg-blue-100 text-blue-800',
-                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`
-                    };
+                    return { badgeClass: 'bg-blue-100 text-blue-800' };
                 case 'Em Andamento':
-                    return {
-                        badgeClass: 'bg-yellow-100 text-yellow-800',
-                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
-                    };
+                    return { badgeClass: 'bg-yellow-100 text-yellow-800' };
                 case 'Concluído':
-                    return {
-                        badgeClass: 'bg-green-100 text-green-800',
-                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
-                    };
+                    return { badgeClass: 'bg-green-100 text-green-800' };
                 case 'Cancelado':
-                    return {
-                        badgeClass: 'bg-red-100 text-red-800',
-                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
-                    };
+                    return { badgeClass: 'bg-red-100 text-red-800' };
                 default:
-                    return {
-                        badgeClass: 'bg-gray-100 text-gray-800',
-                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>`
-                    };
+                    return { badgeClass: 'bg-gray-100 text-gray-800' };
             }
+        }
+        
+        /**
+         * Pega uma cor para um técnico. Reinicia o índice se necessário.
+         * @param {string} techName - Nome do técnico
+         */
+        function getColorForTechnician(techName) {
+            if (!technicianColors[techName]) {
+                technicianColors[techName] = COLOR_PALETTE[colorIndex];
+                colorIndex = (colorIndex + 1) % COLOR_PALETTE.length; // Rotação
+            }
+            return technicianColors[techName];
         }
 
         // Reseta o formulário
@@ -505,9 +507,8 @@
             cancelEditButton.classList.add('hidden');
             document.getElementById('current-edit-id').value = '';
             document.getElementById('samplesRequested').checked = false;
-            dateStartInput.value = '';
-            dateEndInput.value = '';
-            dateEndInput.min = ''; // Limpa a restrição 'min'
+            document.getElementById('dateStart').value = '';
+            document.getElementById('dateEnd').value = '';
             document.getElementById('isTravel').checked = false;
         }
 
@@ -531,46 +532,86 @@
             dayDetailsModal.classList.add('hidden');
         }
 
-        // --- Funções do Calendário e Dashboard ---
+        // --- Funções do Calendário ---
 
         /**
-         * NOVO: Atualiza o dashboard com estatísticas do mês
+         * Atualiza os painéis de resumo (Resumo do Mês e Próximos)
+         * @param {Array} assignments - Lista de todos os agendamentos
+         * @param {Date} date - A data do calendário (para filtrar o mês)
          */
-        function updateDashboard(assignments, currentDate) {
-            const year = currentDate.getFullYear();
-            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-            const currentMonthString = `${year}-${month}`;
+        function updateSummaryPanels(assignments, date) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1; // 1-12
+            const today = getTodayDateString();
 
-            // Filtra agendamentos que *começam* no mês corrente
-            const monthAssignments = assignments.filter(a => 
-                a.dateStart && a.dateStart.substring(0, 7) === currentMonthString
-            );
-
-            // 1. Total de Agendamentos
-            summaryTotal.textContent = monthAssignments.length;
-
-            // 2. Total de Viagens
-            const totalViagens = monthAssignments.filter(a => a.isTravel).length;
-            summaryTravels.textContent = totalViagens;
-
-            // 3. Técnico do Mês
-            if (monthAssignments.length === 0) {
-                summaryMvp.textContent = 'N/A';
-                return;
-            }
-
-            const techCounts = monthAssignments.reduce((acc, a) => {
-                acc[a.technicianName] = (acc[a.technicianName] || 0) + 1;
+            // --- Resumo do Mês ---
+            monthSummaryLoader.classList.add('hidden');
+            monthSummary.classList.remove('hidden');
+            
+            const assignmentsThisMonth = assignments.filter(a => {
+                const start = new Date(a.dateStart + 'T00:00:00');
+                // Filtra por agendamentos que comecem ou terminem neste mês
+                return start.getFullYear() === year && (start.getMonth() + 1) === month;
+            });
+            
+            const travelThisMonth = assignmentsThisMonth.filter(a => a.isTravel).length;
+            
+            // Contagem de técnico do mês
+            const techCount = assignmentsThisMonth.reduce((acc, a) => {
+                if (a.status !== 'Cancelado') {
+                    acc[a.technicianName] = (acc[a.technicianName] || 0) + 1;
+                }
                 return acc;
             }, {});
+            
+            const topTech = Object.entries(techCount).sort((a, b) => b[1] - a[1])[0];
+            
+            summaryTotal.textContent = assignmentsThisMonth.length;
+            summaryTravel.textContent = travelThisMonth;
+            summaryTopTech.textContent = topTech ? `${topTech[0]} (${topTech[1]})` : 'N/A';
+            
+            // --- Próximos Agendamentos ---
+            upcomingLoader.classList.add('hidden');
+            upcomingList.innerHTML = ''; // Limpa a lista
+            
+            const upcomingAssignments = assignments
+                .filter(a => a.dateStart >= today && a.status !== 'Cancelado') // Filtra futuros e não cancelados
+                .sort((a, b) => a.dateStart.localeCompare(b.dateStart)) // Ordena por data
+                .slice(0, 5); // Pega os próximos 5
 
-            const mvp = Object.entries(techCounts).sort((a, b) => b[1] - a[1])[0];
-            summaryMvp.textContent = mvp[0]; // Nome do técnico
-            summaryMvp.title = `${mvp[0]} com ${mvp[1]} agendamento(s)`; // Dica
+            if (upcomingAssignments.length === 0) {
+                upcomingList.innerHTML = '<p class="text-text-light italic">Nenhum agendamento futuro encontrado.</p>';
+                return;
+            }
+            
+            upcomingAssignments.forEach(a => {
+                const daysDiff = dateDiffInDays(today, a.dateStart);
+                let countdownText = '';
+                if (daysDiff === 0) {
+                    countdownText = '<span class="font-bold text-green-600">É hoje!</span>';
+                } else if (daysDiff === 1) {
+                    countdownText = '<span class="font-bold text-yellow-600">Falta 1 dia</span>';
+                } else {
+                    countdownText = `<span class="font-bold text-blue-600">Faltam ${daysDiff} dias</span>`;
+                }
+                
+                upcomingList.innerHTML += `
+                    <div class="p-2 bg-gray-50 rounded-md border border-border-color">
+                        <span class="block text-text-dark font-medium">${a.technicianName}</span>
+                        <span class="block text-text-light text-xs">Visita com ${a.clientName}</span>
+                        <span class="block text-xs mt-1">${countdownText}</span>
+                    </div>
+                `;
+            });
         }
+
 
         function generateCalendar(date) {
             calendarGridElement.innerHTML = '';
+            // Reseta as cores dos técnicos a cada mudança de mês
+            technicianColors = {};
+            colorIndex = 0;
+
             const today = getTodayDateString();
             const year = date.getFullYear();
             const month = date.getMonth();
@@ -579,16 +620,6 @@
 
             const firstDayOfMonth = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            // --- NOVO: Atribui cores aos técnicos do mês ---
-            techColorMap.clear();
-            const currentMonthString = `${year}-${String(month + 1).padStart(2, '0')}`;
-            const monthAssignments = allAssignments.filter(a => a.dateStart && a.dateStart.substring(0, 7) === currentMonthString);
-            const uniqueTechs = [...new Set(monthAssignments.map(a => a.technicianName))];
-            uniqueTechs.forEach((name, index) => {
-                techColorMap.set(name, techColors[index % techColors.length]);
-            });
-            // --- Fim da atribuição de cores ---
 
             // Dias vazios
             for (let i = 0; i < firstDayOfMonth; i++) {
@@ -599,57 +630,52 @@
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                // LÓGICA ATUALIZADA: Verifica se o dia está DENTRO da faixa de datas
                 const assignmentsForDay = allAssignments.filter(a => 
                     a.dateStart && a.dateEnd && 
                     dateString >= a.dateStart && dateString <= a.dateEnd
-                );
+                ).sort((a,b) => a.dateStart.localeCompare(b.dateStart)); // Ordena para priorizar
 
                 const dayElement = document.createElement('div');
                 dayElement.className = `calendar-day text-text-dark relative`;
                 if (dateString === today) dayElement.classList.add('today');
-                if (assignmentsForDay.length > 0) dayElement.classList.add('has-assignments');
 
-                // NOVO: Gera os nomes dos técnicos E clientes para o dia
-                const item = assignmentsForDay[0]; // Pega o primeiro item
-                let assignmentsListHTML = '';
+                let assignmentsHtml = '';
+                const maxToShow = 2; // Mostrar os 2 primeiros
                 
-                if (item) {
-                    let color = techColorMap.get(item.technicianName) || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
-                    const travelIcon = item.isTravel ? '✈️' : '';
+                assignmentsForDay.slice(0, maxToShow).forEach(a => {
+                    const techColor = getColorForTechnician(a.technicianName);
+                    const isCancelled = a.status === 'Cancelado';
+                    const travelIcon = a.isTravel ? '✈️' : '';
                     
-                    // NOVO: Se o status for 'Cancelado', sobrescreve a cor para vermelho
-                    if (item.status === 'Cancelado') {
-                        color = { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' };
-                    }
-                    
-                    assignmentsListHTML = `
-                        <div class="text-xs text-left px-1.5 py-1 rounded border ${color.bg} ${color.border}" 
-                             title="${item.technicianName} - ${item.clientName}">
-                            <div class="font-bold truncate ${color.text}">
-                                ${travelIcon} ${item.technicianName}
-                            </div>
-                            <div class="truncate ${color.text} opacity-75">
-                                ${item.status === 'Cancelado' ? 'CANCELADO' : item.clientName}
-                            </div>
-                        </div>`;
+                    const badgeClass = isCancelled 
+                        ? 'cancelled' 
+                        : `${techColor.bg} ${techColor.border} ${techColor.text}`;
+
+                    assignmentsHtml += `
+                        <div class="assignment-badge ${badgeClass}" title="${a.technicianName} - ${a.clientName} ${travelIcon}">
+                            <strong class="font-semibold">${a.technicianName} ${travelIcon}</strong>
+                            <span class="block text-xs opacity-75">${isCancelled ? 'CANCELADO' : a.clientName}</span>
+                        </div>
+                    `;
+                });
+                
+                if (assignmentsForDay.length > maxToShow) {
+                    assignmentsHtml += `<div class="text-xs text-text-light font-medium mt-1">+ ${assignmentsForDay.length - maxToShow} mais</div>`;
                 }
-                
-                const moreAssignmentsHTML = assignmentsForDay.length > 1 
-                    ? `<div class="text-xs text-text-light font-semibold mt-1">+ ${assignmentsForDay.length - 1} mais</div>` 
-                    : '';
-                
+
                 dayElement.innerHTML = `
                     <span class="font-semibold text-lg">${day}</span>
-                    <div class="mt-1 flex flex-col gap-0.5">
-                        ${assignmentsListHTML}
-                        ${moreAssignmentsHTML}
+                    <div class="mt-1 space-y-1">
+                        ${assignmentsHtml}
                     </div>
                 `;
                 dayElement.dataset.date = dateString;
                 dayElement.addEventListener('click', () => showDayDetails(dateString, assignmentsForDay));
                 calendarGridElement.appendChild(dayElement);
             }
+            
+            // Atualiza os painéis de resumo
+            updateSummaryPanels(allAssignments, date);
         }
 
         // Mostra o modal com detalhes do dia
@@ -664,79 +690,52 @@
 
                 assignmentsForDay.forEach(item => {
                     const statusInfo = getStatusInfo(item.status);
+                    const techColor = getColorForTechnician(item.technicianName);
                     
-                    // LÓGICA ATUALIZADA: Adiciona texto "Amostra Solicitada?"
-                    const samplesDisplay = item.samplesRequested ? 
-                        `<span class="text-green-500 text-lg" title="Sim">👍</span>` : 
-                        `<span class="text-red-500 text-lg" title="Não">👎</span>`;
-
-                    const samplesHTML = `
-                        <span class="ml-3 text-sm font-normal text-text-light">
-                            | Amostra Solicitada? ${samplesDisplay}
-                        </span>
-                    `;
+                    const samplesText = item.samplesRequested ? 
+                        `<span title="Amostras Solicitadas" class="ml-2 text-green-500 text-lg">👍</span>` : 
+                        `<span title="Amostras NÃO Solicitadas" class="ml-2 text-red-500 text-lg">👎</span>`;
                     
                     const travelIcon = item.isTravel ? `<span class="ml-2" title="Em viagem">✈️</span>` : '';
-                    
-                    // NOVO: Pega a cor do técnico
-                    let color = techColorMap.get(item.technicianName) || { bg: 'bg-gray-50', text: 'text-gray-800', border: 'border-gray-300' };
-
-                    // NOVO: Se estiver cancelado, sobrescreve para vermelho
-                    if (item.status === 'Cancelado') {
-                        color = { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-400' };
-                    }
-
-                    // Calcular duração
-                    let durationText = '(1 dia)';
-                    if (item.dateStart && item.dateEnd) {
-                        try {
-                            const d1 = new Date(item.dateStart + 'T00:00:00');
-                            const d2 = new Date(item.dateEnd + 'T00:00:00');
-                            const diffTime = Math.abs(d2 - d1);
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para ser inclusivo
-                            durationText = `(${diffDays} ${diffDays > 1 ? 'dias' : 'dia'})`;
-                        } catch(e) {}
-                    }
                     
                     const dateRange = (item.dateStart === item.dateEnd) ? 
                         formatDisplayDate(item.dateStart) : 
                         `De ${formatDisplayDate(item.dateStart)} até ${formatDisplayDate(item.dateEnd)}`;
-
-                    // NOVO: Lógica para botões de Cancelar/Reativar
-                    let quickActionButton = '';
+                    
+                    // Lógica dos botões de ação rápida
+                    let actionButton = '';
                     if (item.status === 'Cancelado') {
-                        quickActionButton = `
-                            <button data-id="${item.id}" class="reactivate-btn-modal flex-1 bg-green-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-green-600 transition">
-                                Reativar (Agendado)
+                        actionButton = `<button data-id="${item.id}" data-status="Agendado" class="reactivate-btn flex-1 bg-green-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-green-600 transition">
+                                Reativar
                             </button>`;
                     } else {
-                        quickActionButton = `
-                            <button data-id="${item.id}" class="cancel-btn-modal flex-1 bg-gray-400 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-gray-500 transition">
+                        actionButton = `<button data-id="${item.id}" data-status="Cancelado" class="cancel-btn flex-1 bg-gray-400 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-gray-500 transition">
                                 Marcar como Cancelado
                             </button>`;
                     }
 
                     const card = document.createElement('div');
-                    card.className = `bg-gray-50 p-4 rounded-lg shadow-sm mb-3 border-l-4 ${color.border}`; // Usa a cor do técnico
+                    card.className = `bg-gray-50 p-4 rounded-lg shadow-sm border-l-4 ${techColor.border.replace('border-', 'border-l-')}`;
                     card.innerHTML = `
                         <div class="flex justify-between items-center mb-1">
-                            <h4 class="text-lg font-bold ${color.text}">${item.technicianName} ${travelIcon}</h4>
+                            <h4 class="text-lg font-bold ${techColor.text}">${item.technicianName} ${travelIcon}</h4>
                             <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusInfo.badgeClass}">
-                                ${statusInfo.icon} ${item.status}
+                                ${item.status}
                             </span>
                         </div>
-                        <p class="text-md font-medium text-text-dark flex items-center">
-                            <span>${item.clientName}</span>
-                            ${samplesHTML}
-                        </p>
-                        <p class="text-sm text-text-light mt-2"><strong>Ação:</strong> ${item.action}</p>
+                        <p class="text-md font-medium text-text-dark">${item.clientName}</p>
+                        <p class="text-sm text-text-light mt-1"><strong>Ação:</strong> ${item.action}</p>
                         <p class="text-sm text-text-light"><strong>Região:</strong> ${item.region}</p>
-                        <p class="text-sm text-text-light"><strong>Período:</strong> ${dateRange} <span class="font-medium">${durationText}</span></p>
+                        <p class="text-sm text-text-light"><strong>Período:</strong> ${dateRange}</p>
+                        <p class="text-sm text-text-light mt-1 flex items-center">
+                            <strong>Amostra Solicitada?</strong> ${samplesText}
+                        </p>
+                        
                         <div class="flex gap-2 mt-3 pt-3 border-t border-border-color">
                             <button data-id="${item.id}" class="edit-btn-modal flex-1 bg-yellow-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-yellow-600 transition">
                                 Editar
                             </button>
-                            ${quickActionButton}
+                            ${actionButton}
                             <button data-id="${item.id}" class="delete-btn-modal flex-1 bg-red-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-red-600 transition">
                                 Excluir
                             </button>
@@ -756,100 +755,56 @@
                 document.querySelectorAll('.delete-btn-modal').forEach(btn => {
                     btn.addEventListener('click', handleDeleteClick);
                 });
-                // NOVO: Listeners para os botões de ação rápida
-                document.querySelectorAll('.cancel-btn-modal').forEach(btn => {
-                    btn.addEventListener('click', (e) => handleQuickStatusChange(e, 'Cancelado'));
-                });
-                document.querySelectorAll('.reactivate-btn-modal').forEach(btn => {
-                    btn.addEventListener('click', (e) => handleQuickStatusChange(e, 'Agendado'));
+                document.querySelectorAll('.cancel-btn, .reactivate-btn').forEach(btn => {
+                    btn.addEventListener('click', handleQuickStatusChange);
                 });
             }
 
             openDetailsModal();
         }
-
-        /** NOVO: Atualiza o painel de "Próximos Agendamentos" */
-        function updateUpcomingEvents(assignments) {
-            const todayString = getTodayDateString();
-            const upcomingListElement = document.getElementById('upcoming-events-list');
-            
-            // Filtra por agendamentos futuros (data de início >= hoje) e não cancelados
-            const upcoming = assignments
-                .filter(a => a.dateStart >= todayString && a.status !== 'Cancelado')
-                .sort((a, b) => a.dateStart.localeCompare(b.dateStart)); // Ordena do mais próximo para o mais distante
-
-            upcomingListElement.innerHTML = ''; // Limpa a lista
-
-            if (upcoming.length === 0) {
-                upcomingListElement.innerHTML = `<p class="text-text-light italic" id="upcoming-placeholder">Nenhum agendamento futuro encontrado.</p>`;
-                return;
-            }
-
-            // Limita a 5 itens
-            upcoming.slice(0, 5).forEach(item => {
-                const daysLeft = getDaysLeft(item.dateStart);
-                let countdownText = '';
-                let countdownColor = 'text-text-light';
-
-                if (daysLeft === 0) {
-                    countdownText = "É hoje!";
-                    countdownColor = 'text-green-600 font-bold';
-                } else if (daysLeft === 1) {
-                    countdownText = "Falta 1 dia";
-                    countdownColor = 'text-yellow-600 font-semibold';
-                } else if (daysLeft > 1) {
-                    countdownText = `Faltam ${daysLeft} dias`;
-                    if (daysLeft <= 7) {
-                        countdownColor = 'text-yellow-600 font-semibold';
-                    }
-                } else {
-                    // Se por algum motivo for negativo, não mostra
-                    return; 
-                }
-
-                // Pega a cor do técnico (se já tiver sido atribuída pelo calendário)
-                const color = techColorMap.get(item.technicianName) || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
-
-                const eventHTML = `
-                    <div class="p-3 rounded-md border ${color.border} ${color.bg} ${color.text} shadow-sm">
-                        <div class="flex justify-between items-center">
-                            <span class_name="font-bold">${item.technicianName}</span>
-                            <span class="font-bold text-sm ${countdownColor}">${countdownText}</span>
-                        </div>
-                        <div class="text-sm opacity-80">
-                            ${item.clientName} (Início: ${formatDisplayDate(item.dateStart)})
-                        </div>
-                    </div>
-                `;
-                upcomingListElement.innerHTML += eventHTML;
-            });
-        }
-
-
+        
         // --- Funções CRUD ---
+
+        /**
+         * Altera o status rapidamente (Cancelado/Agendado)
+         */
+        async function handleQuickStatusChange(e) {
+            const id = e.target.dataset.id;
+            const newStatus = e.target.dataset.status;
+            
+            try {
+                const docRef = doc(db, assignmentsColPath, id);
+                await updateDoc(docRef, { status: newStatus });
+                showToast(`Agendamento ${newStatus === 'Cancelado' ? 'cancelado' : 'reativado'}!`, 'success');
+                closeDetailsModal();
+            } catch (error) {
+                console.error("Erro ao atualizar status: ", error);
+                showToast("Erro ao atualizar status.", 'error');
+            }
+        }
 
         async function handleSave(e) {
             e.preventDefault();
             
             const assignmentData = {
-                technicianName: document.getElementById('technicianName').value,
-                clientName: document.getElementById('clientName').value,
-                action: document.getElementById('action').value,
-                region: document.getElementById('region').value,
-                dateStart: dateStartInput.value,
-                dateEnd: dateEndInput.value,
+                technicianName: document.getElementById('technicianName').value.trim(),
+                clientName: document.getElementById('clientName').value.trim(),
+                action: document.getElementById('action').value.trim(),
+                region: document.getElementById('region').value.trim(),
+                dateStart: document.getElementById('dateStart').value,
+                dateEnd: document.getElementById('dateEnd').value,
                 status: document.getElementById('status').value,
                 samplesRequested: document.getElementById('samplesRequested').checked,
                 isTravel: document.getElementById('isTravel').checked,
             };
 
             if (!assignmentData.technicianName || !assignmentData.clientName || !assignmentData.dateStart || !assignmentData.dateEnd) {
-                showToast("Por favor, preencha Técnico, Cliente, Data de Início e Data de Fim.", true);
+                showToast("Preencha Técnico, Cliente, Data de Início e Fim.", 'error');
                 return;
             }
 
             if (assignmentData.dateEnd < assignmentData.dateStart) {
-                showToast("A data de fim não pode ser anterior à data de início.", true);
+                showToast("A data de fim não pode ser anterior à data de início.", 'error');
                 return;
             }
 
@@ -857,31 +812,15 @@
                 if (currentEditId) {
                     const docRef = doc(db, assignmentsColPath, currentEditId);
                     await updateDoc(docRef, assignmentData);
-                    showToast("Agendamento atualizado!");
+                    showToast("Agendamento atualizado!", 'success');
                 } else {
                     await addDoc(assignmentsCollection, assignmentData);
-                    showToast("Agendamento adicionado!");
+                    showToast("Agendamento adicionado!", 'success');
                 }
                 closeFormModal();
             } catch (error) {
                 console.error("Erro ao salvar: ", error);
-                showToast("Ocorreu um erro ao salvar.", true);
-            }
-        }
-
-        // NOVO: Função para Ação Rápida de Cancelar/Reativar (Sem confirm/alert)
-        async function handleQuickStatusChange(e, newStatus) {
-            const id = e.target.dataset.id;
-            const actionText = newStatus === 'Cancelado' ? 'cancelado' : 'reativado';
-
-            try {
-                const docRef = doc(db, assignmentsColPath, id);
-                await updateDoc(docRef, { status: newStatus });
-                showToast(`Agendamento ${actionText} com sucesso!`);
-                closeDetailsModal();
-            } catch (error) {
-                console.error(`Erro ao ${actionText}: `, error);
-                showToast(`Ocorreu um erro ao ${actionText} o agendamento.`, true);
+                showToast("Ocorreu um erro ao salvar.", 'error');
             }
         }
 
@@ -895,9 +834,8 @@
             document.getElementById('clientName').value = item.clientName;
             document.getElementById('action').value = item.action;
             document.getElementById('region').value = item.region;
-            dateStartInput.value = item.dateStart;
-            dateEndInput.value = item.dateEnd;
-            dateEndInput.min = item.dateStart; // Aplica a restrição
+            document.getElementById('dateStart').value = item.dateStart;
+            document.getElementById('dateEnd').value = item.dateEnd;
             document.getElementById('status').value = item.status;
             document.getElementById('samplesRequested').checked = item.samplesRequested || false;
             document.getElementById('isTravel').checked = item.isTravel || false;
@@ -912,15 +850,15 @@
         async function handleDeleteClick(e) {
             const id = e.target.dataset.id;
             
-            // REMOVIDO: confirm()
+            // Sem 'confirm' - ação direta
             try {
                 const docRef = doc(db, assignmentsColPath, id);
                 await deleteDoc(docRef);
-                showToast("Agendamento excluído!");
+                showToast("Agendamento excluído!", 'success');
                 closeDetailsModal();
             } catch (error) {
                 console.error("Erro ao excluir: ", error);
-                showToast("Ocorreu um erro ao excluir.", true);
+                showToast("Ocorreu um erro ao excluir.", 'error');
             }
         }
 
@@ -928,18 +866,25 @@
 
         async function setupFirebase() {
             try {
-                setLogLevel('Debug'); // Descomentado para ajudar na depuração
+                // setLogLevel('Debug'); // Útil para depuração
 
-                // --- CORREÇÃO ---
-                // Removendo a verificação explícita que estava causando a falha.
-                // Vamos tentar a conexão direta.
-                const firebaseConfig = JSON.parse(__firebase_config);
+                // --- CORREÇÃO: Configuração do Firebase do Usuário ---
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCD_wK7_X86Uo4dGN0M1EkCI5AiNkrPe5g",
+                    authDomain: "calendariotecnicos-5f986.firebaseapp.com",
+                    projectId: "calendariotecnicos-5f986",
+                    storageBucket: "calendariotecnicos-5f986.firebasestorage.app",
+                    messagingSenderId: "140842984743",
+                    appId: "1:140842984743:web:405dc24df581402b557502",
+                    measurementId: "G-WKTX16FQ30"
+                };
                 // --- FIM DA CORREÇÃO ---
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
+                // Define a coleção principal
                 assignmentsCollection = collection(db, assignmentsColPath);
 
                 onAuthStateChanged(auth, async (user) => {
@@ -947,18 +892,36 @@
                         userId = user.uid;
                         authStatus.textContent = `Conectado (ID: ${userId.substring(0, 6)}...)`;
                         authStatus.classList.add('text-green-600');
+                        
+                        // Inicia o listener de dados (onSnapshot)
                         loadAssignments();
                     } else {
-                        authStatus.textContent = 'Usuário não autenticado.';
+                        authStatus.textContent = 'Usuário não autenticado. Tentando login anônimo...';
                         authStatus.classList.add('text-red-600');
+                        // Se não estiver logado, tente logar anonimamente
+                        try {
+                            await signInAnonymously(auth);
+                        } catch (anonError) {
+                            console.error("Falha no login anônimo: ", anonError);
+                            authStatus.textContent = 'Falha no login anônimo.';
+                        }
                     }
                 });
 
-                if (typeof __initial_auth_token !== 'undefined') {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                // --- CORREÇÃO: Autenticação Simplificada ---
+                // A lógica de login agora está principalmente dentro do onAuthStateChanged.
+                // Apenas iniciamos o processo se não houver usuário.
+                if (!auth.currentUser) {
+                     try {
+                        await signInAnonymously(auth);
+                    } catch (error) {
+                         console.error("Falha ao inicializar o Firebase: ", error);
+                         authStatus.textContent = 'Falha ao conectar. (Verifique o Login Anônimo no Firebase)';
+                         authStatus.classList.add('text-red-600');
+                    }
                 }
+                // --- FIM DA CORREÇÃO ---
+
 
             } catch (error) {
                 console.error("Falha ao inicializar o Firebase: ", error);
@@ -976,18 +939,12 @@
                 allAssignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 loader.classList.add('hidden');
                 loadingText.classList.add('hidden');
-                // Atualiza o calendário e o dashboard
                 generateCalendar(currentCalendarDate);
-                updateDashboard(allAssignments, currentCalendarDate);
-                
-                // NOVO: Atualiza a contagem regressiva
-                updateUpcomingEvents(allAssignments);
-            
             }, (error) => {
                 console.error("Erro ao carregar dados: ", error);
                 loader.classList.add('hidden');
                 loadingText.classList.add('hidden');
-                showToast('Erro ao carregar dados.', true);
+                showToast('Erro ao carregar dados.', 'error');
             });
         }
         
@@ -996,20 +953,16 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupFirebase();
             generateCalendar(currentCalendarDate);
-            updateDashboard(allAssignments, currentCalendarDate); // Atualiza o dashboard na carga inicial
 
             // Navegação do Calendário
             prevMonthButton.addEventListener('click', () => {
                 currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
                 generateCalendar(currentCalendarDate);
-                updateDashboard(allAssignments, currentCalendarDate); // Atualiza o dashboard ao mudar de mês
-                // Não é preciso chamar updateUpcomingEvents aqui, pois ele é global (não depende do mês)
             });
 
             nextMonthButton.addEventListener('click', () => {
                 currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
                 generateCalendar(currentCalendarDate);
-                updateDashboard(allAssignments, currentCalendarDate); // Atualiza o dashboard ao mudar de mês
             });
 
             // Listeners dos Modais
@@ -1024,18 +977,13 @@
             form.addEventListener('submit', handleSave);
             cancelEditButton.addEventListener('click', resetForm);
             
-            // Validação de Data
-            dateStartInput.addEventListener('change', (e) => { 
-                dateEndInput.min = e.target.value; 
-                if (dateEndInput.value && dateEndInput.value < e.target.value) {
+            // Validação de data no formulário
+            document.getElementById('dateStart').addEventListener('change', (e) => {
+                const dateEndInput = document.getElementById('dateEnd');
+                if (!dateEndInput.value || dateEndInput.value < e.target.value) {
                     dateEndInput.value = e.target.value;
                 }
-            });
-            dateEndInput.addEventListener('change', (e) => {
-                if (!dateStartInput.value) {
-                    dateStartInput.value = e.target.value;
-                    dateEndInput.min = e.target.value;
-                }
+                dateEndInput.min = e.target.value;
             });
         });
 
