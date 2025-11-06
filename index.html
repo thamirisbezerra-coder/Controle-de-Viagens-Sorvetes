@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendário de Técnicos de Sorvete</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuração do Tailwind (Cores da Marca e Fontes) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Pacifico', 'cursive'], // Título fofo
+                        sans: ['Poppins', 'sans-serif'], // Fonte profissional
+                    },
+                    colors: {
+                        'brand-blue': '#0D47A1',   // Azul Doremus (principal)
+                        'brand-blue-light': '#1E88E5', // Azul mais claro para hover/foco
+                        'brand-blue-lighter': '#E3F2FD', // Fundo de dia com agendamento
+                        'background': '#F9FAFB',  // Fundo principal (cinza muito claro)
+                        'card-bg': '#FFFFFF',     // Fundo dos cards e calendário
+                        'border-color': '#E5E7EB', // Bordas suaves
+                        'text-dark': '#1F2937',    // Texto principal
+                        'text-light': '#6B7280',   // Texto secundário
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <!-- Google Fonts (Pacifico e Poppins) -->
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Estilo para o loader */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0D47A1; /* Azul da marca */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Fundo limpo, sem ícones */
+        body.bg-background {
+            background-color: #F9FAFB;
+        }
+
+        /* Estilos do Calendário */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .calendar-day {
+            min-height: 120px; /* Aumentado de 110px para 120px para caber os nomes */
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: 1px solid #E5E7EB; /* Borda suave */
+            background-color: #FFFFFF;
+        }
+
+        .calendar-day:hover:not(.empty-day) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .calendar-day.has-assignments {
+            background-color: #E3F2FD; /* Azul bem claro */
+        }
+
+        .calendar-day.today {
+            border: 2px solid #1E88E5; /* Azul claro */
+            box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.2);
+        }
+
+        .empty-day {
+            background-color: #F9FAFB;
+            cursor: default;
+        }
+        
+            /* O indicador de ponto (•) - NÃO MAIS USADO, MAS MANTIDO PARA REFERÊNCIA */
+        .assignment-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: #0D47A1; /* brand-blue */
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            transition: opacity 0.3s ease;
+        }
+        
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+
+        /* Classes para mostrar/esconder o modal */
+        .modal.hidden .modal-overlay {
+            opacity: 0;
+        }
+        .modal.hidden .modal-content {
+            transform: scale(0.95) translateY(20px);
+        }
+
+        /* NOVO: Estilo para o Toast de Notificação */
+        #toast {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 100;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        #toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="bg-background font-sans text-text-dark">
+
+    <!-- Container Principal -->
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Cabeçalho e Botão de Adicionar -->
+        <header class="mb-6 flex flex-col sm:flex-row justify-between items-center">
+            <div class="text-center sm:text-left mb-4 sm:mb-0">
+                <h1 class="text-4xl sm:text-5xl font-display text-brand-blue">Calendário de Técnicos</h1>
+                <p class="text-lg text-text-light">Responsável: Vinicius Madaleno</p>
+                <p class="text-sm text-gray-500 mt-1" id="auth-status">Conectando...</p>
+            </div>
+            <button id="open-add-modal" 
+                class="flex items-center gap-2 bg-brand-blue text-white py-2 px-5 rounded-lg font-semibold hover:bg-brand-blue-light transition shadow-lg">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Adicionar Agendamento
+            </button>
+        </header>
+
+        <!-- NOVO: Bloco de Orientações -->
+        <div class="bg-card-bg p-5 rounded-lg shadow-md border border-border-color mb-6 text-text-dark">
+            <div class="flex items-center gap-3">
+                <svg class="h-6 w-6 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h3 class="text-xl font-semibold text-brand-blue">Intuito e Orientações</h3>
+            </div>
+            <p class="mt-3 text-sm text-text-light">
+                <strong>Intuito:</strong> Este calendário centraliza a agenda dos técnicos, permitindo o gerenciamento em tempo real de visitas, viagens e status dos clientes.
+            </p>
+            <p class="mt-2 text-sm text-text-light">
+                <strong>Orientações:</strong>
+                <ul class="list-disc list-inside ml-1 mt-1">
+                    <li>Use o botão <span class="font-semibold text-brand-blue">"+ Adicionar Agendamento"</span> para criar um novo evento.</li>
+                    <li>Clique em um dia no calendário para ver os detalhes.</li>
+                    <li>No modal de detalhes, você pode <span class="font-semibold text-yellow-600">Editar</span>, <span class="font-semibold text-red-600">Excluir</span> ou <span class="font-semibold text-gray-600">Cancelar/Reativar</span> um agendamento.</li>
+                </ul>
+            </p>
+        </div>
+
+        <!-- NOVO: Resumo do Mês -->
+        <div id="summary-dashboard" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-card-bg p-4 rounded-lg shadow-md border border-border-color text-center">
+                <h4 class="text-sm font-semibold text-text-light">Agendamentos no Mês</h4>
+                <p class="text-3xl font-bold text-brand-blue" id="summary-total">0</p>
+            </div>
+            <div class="bg-card-bg p-4 rounded-lg shadow-md border border-border-color text-center">
+                <h4 class="text-sm font-semibold text-text-light">Viagens ✈️</h4>
+                <p class="text-3xl font-bold text-brand-blue" id="summary-travels">0</p>
+            </div>
+            <div class="bg-card-bg p-4 rounded-lg shadow-md border border-border-color text-center">
+                <h4 class="text-sm font-semibold text-text-light">Técnico do Mês</h4>
+                <p class="text-2xl font-bold text-brand-blue truncate" id="summary-mvp">N/A</p>
+            </div>
+        </div>
+
+        <!-- NOVO: Próximos Agendamentos (Contagem Regressiva) -->
+        <div class="bg-card-bg p-5 rounded-lg shadow-md border border-border-color mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <svg class="h-6 w-6 text-brand-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <h3 class="text-xl font-semibold text-brand-blue">Próximos Agendamentos</h3>
+            </div>
+            <div id="upcoming-events-list" class="space-y-3 max-h-48 overflow-y-auto">
+                <p class="text-text-light italic" id="upcoming-placeholder">Carregando próximos agendamentos...</p>
+            </div>
+        </div>
+
+
+        <!-- Seção do Calendário -->
+        <div class="bg-card-bg p-4 sm:p-6 rounded-lg shadow-xl mb-8 border border-border-color">
+            <div class="flex justify-between items-center mb-4">
+                <button id="prev-month" class="p-2 rounded-full hover:bg-gray-100 text-text-light">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h2 id="current-month-year" class="text-2xl sm:text-3xl font-semibold text-text-dark"></h2>
+                <button id="next-month" class="p-2 rounded-full hover:bg-gray-100 text-text-light">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                </button>
+            </div>
+
+            <!-- Dias da Semana -->
+            <div class="calendar-grid text-center font-semibold text-text-light mb-2">
+                <div>Dom</div>
+                <div>Seg</div>
+                <div>Ter</div>
+                <div>Qua</div>
+                <div>Qui</div>
+                <div>Sex</div>
+                <div>Sáb</div>
+            </div>
+
+            <!-- Grid do Calendário -->
+            <div id="calendar-grid" class="calendar-grid text-text-dark">
+                <!-- Dias serão injetados aqui pelo JS -->
+            </div>
+            
+            <!-- Loader -->
+            <div id="loader" class="flex justify-center items-center h-32 mt-4">
+                <div class="loader hidden"></div>
+                <p id="loading-text" class="text-text-light hidden ml-3">Carregando agendamentos...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal: Adicionar/Editar Agendamento -->
+    <div id="form-modal" class="fixed inset-0 z-50 overflow-y-auto hidden modal">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <!-- Overlay -->
+            <div class="fixed inset-0 modal-overlay" id="form-modal-overlay"></div>
+            
+            <!-- Conteúdo do Modal -->
+            <div class="bg-card-bg rounded-lg shadow-xl max-w-lg w-full p-6 relative z-10 modal-content">
+                <div class="flex justify-between items-center pb-3 border-b border-border-color mb-4">
+                    <h3 class="text-2xl font-semibold text-text-dark" id="form-title">Adicionar Agendamento</h3>
+                    <button class="text-gray-500 hover:text-gray-700" id="close-form-modal">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                
+                <!-- Formulário -->
+                <form id="assignment-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="technicianName" class="block text-sm font-medium text-text-light">Técnico</label>
+                        <input type="text" id="technicianName" required class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="clientName" class="block text-sm font-medium text-text-light">Cliente</label>
+                        <input type="text" id="clientName" required class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="action" class="block text-sm font-medium text-text-light">Ação / Serviço</label>
+                        <input type="text" id="action" placeholder="Ex: Conexão, Inovattion Day" required class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                    </div>
+                    <div>
+                        <label for="region" class="block text-sm font-medium text-text-light">Região</label>
+                        <input type="text" id="region" placeholder="Ex: Zona Leste" required class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                    </div>
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-text-light">Status</label>
+                        <select id="status" class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                            <option value="Agendado">Agendado</option>
+                            <option value="Em Andamento">Em Andamento</option>
+                            <option value="Concluído">Concluído</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                    </div>
+                    <!-- Data de Início -->
+                    <div>
+                        <label for="dateStart" class="block text-sm font-medium text-text-light">Data de Início</label>
+                        <input type="date" id="dateStart" required class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                    </div>
+                    <!-- Data de Fim -->
+                    <div>
+                        <label for="dateEnd" class="block text-sm font-medium text-text-light">Data de Fim</label>
+                        <input type="date" id="dateEnd" required class="mt-1 block w-full p-2 border border-border-color rounded-md shadow-sm focus:ring-brand-blue-light focus:border-brand-blue-light">
+                    </div>
+                    <div class="flex items-center mt-2">
+                        <input type="checkbox" id="samplesRequested" class="h-5 w-5 text-brand-blue focus:ring-brand-blue-light border-border-color rounded">
+                        <label for="samplesRequested" class="ml-2 block text-sm font-medium text-text-dark">Amostras já solicitadas?</label>
+                    </div>
+                    <!-- Checkbox de Viagem -->
+                    <div class="flex items-center mt-2">
+                        <input type="checkbox" id="isTravel" class="h-5 w-5 text-brand-blue focus:ring-brand-blue-light border-border-color rounded">
+                        <label for="isTravel" class="ml-2 block text-sm font-medium text-text-dark">Ficará dias fora? (Viagem ✈️)</label>
+                    </div>
+                    
+                    <!-- Botões do Formulário -->
+                    <div class="md:col-span-2 flex items-center gap-4 mt-4">
+                        <button type="submit" id="save-button" class="flex justify-center items-center gap-2 bg-brand-blue text-white py-2 px-4 rounded-lg font-semibold hover:bg-brand-blue-light transition shadow-md">
+                            Salvar
+                        </button>
+                        <button type="button" id="cancel-edit-button" class="hidden bg-gray-400 text-white py-2 px-4 rounded-lg font-semibold hover:bg-gray-500 transition">
+                            Cancelar Edição
+                        </button>
+                        <input type="hidden" id="current-edit-id">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes do Dia (CORRIGIDO - HTML estava faltando) -->
+    <div id="day-details-modal" class="fixed inset-0 z-50 overflow-y-auto hidden modal">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <!-- Overlay -->
+            <div class="fixed inset-0 modal-overlay" id="details-modal-overlay"></div>
+            
+            <!-- Conteúdo do Modal -->
+            <div class="bg-card-bg rounded-lg shadow-xl max-w-lg w-full p-6 relative z-10 modal-content">
+                <div class="flex justify-between items-center pb-3 border-b border-border-color mb-4">
+                    <h3 class="text-2xl font-semibold text-text-dark" id="modal-date-title">Detalhes para o dia</h3>
+                    <button class="text-gray-500 hover:text-gray-700" id="close-details-modal">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                
+                <!-- Lista de Agendamentos -->
+                <div id="modal-assignments-list">
+                    <!-- Agendamentos serão injetados aqui pelo JS -->
+                    <p class="text-text-light italic">Carregando detalhes...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO: Toast de Notificação -->
+    <div id="toast" class="bg-green-500 text-white py-2 px-4 rounded-lg shadow-md">
+        <span id="toast-message">Mensagem</span>
+    </div>
+
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Variáveis Globais ---
+        let db, auth;
+        let userId;
+        let assignmentsCollection;
+        let allAssignments = [];
+        let currentEditId = null;
+        let currentCalendarDate = new Date();
+        let techColorMap = new Map(); // Mapa para as cores dos técnicos
+
+        // Paleta de cores para os técnicos
+        const techColors = [
+            { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
+            { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+            { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+            { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+            { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300' },
+            { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300' },
+            { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300' },
+        ];
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const assignmentsColPath = `/artifacts/${appId}/public/data/assignments`;
+
+        // --- Elementos da DOM ---
+        const authStatus = document.getElementById('auth-status');
+        const loader = document.getElementById('loader');
+        const loadingText = document.getElementById('loading-text');
+        const calendarGridElement = document.getElementById('calendar-grid');
+        const currentMonthYearElement = document.getElementById('current-month-year');
+        const prevMonthButton = document.getElementById('prev-month');
+        const nextMonthButton = document.getElementById('next-month');
+
+        // Dashboard
+        const summaryTotal = document.getElementById('summary-total');
+        const summaryTravels = document.getElementById('summary-travels');
+        const summaryMvp = document.getElementById('summary-mvp');
+
+        // Modal de Formulário
+        const formModal = document.getElementById('form-modal');
+        const openAddModalButton = document.getElementById('open-add-modal');
+        const closeFormModalButton = document.getElementById('close-form-modal');
+        const formModalOverlay = document.getElementById('form-modal-overlay');
+        const form = document.getElementById('assignment-form');
+        const formTitle = document.getElementById('form-title');
+        const saveButton = document.getElementById('save-button');
+        const cancelEditButton = document.getElementById('cancel-edit-button');
+        const dateStartInput = document.getElementById('dateStart');
+        const dateEndInput = document.getElementById('dateEnd');
+
+        // Modal de Detalhes
+        const dayDetailsModal = document.getElementById('day-details-modal');
+        const modalDateTitle = document.getElementById('modal-date-title');
+        const modalAssignmentsList = document.getElementById('modal-assignments-list');
+        const closeDetailsModalButton = document.getElementById('close-details-modal');
+        const detailsModalOverlay = document.getElementById('details-modal-overlay');
+
+        // NOVO: Toast
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        let toastTimeout;
+
+        // --- Funções Auxiliares ---
+
+        /** NOVO: Exibe uma notificação toast */
+        function showToast(message, isError = false) {
+            toastMessage.textContent = message;
+            
+            // Limpa timeout anterior
+            if (toastTimeout) clearTimeout(toastTimeout);
+            
+            // Define cor
+            toast.classList.toggle('bg-red-500', isError);
+            toast.classList.toggle('bg-green-500', !isError);
+
+            // Mostra o toast
+            toast.classList.add('show');
+
+            // Esconde após 3 segundos
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function getTodayDateString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        /** NOVO: Calcula os dias restantes para uma data */
+        function getDaysLeft(dateString) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Zera a hora para comparar apenas datas
+            
+            // Garante que a data do evento também não tenha fuso horário
+            const [year, month, day] = dateString.split('-');
+            const eventDate = new Date(year, month - 1, day); 
+            eventDate.setHours(0, 0, 0, 0);
+
+            const diffTime = eventDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return diffDays;
+        }
+
+        function formatDisplayDate(dateString) {
+            const [year, month, day] = dateString.split('-');
+            return `${day}/${month}/${year}`;
+        }
+
+        // Retorna info de status (incluindo ícone SVG)
+        function getStatusInfo(status) {
+            switch (status) {
+                case 'Agendado':
+                    return {
+                        badgeClass: 'bg-blue-100 text-blue-800',
+                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`
+                    };
+                case 'Em Andamento':
+                    return {
+                        badgeClass: 'bg-yellow-100 text-yellow-800',
+                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+                    };
+                case 'Concluído':
+                    return {
+                        badgeClass: 'bg-green-100 text-green-800',
+                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+                    };
+                case 'Cancelado':
+                    return {
+                        badgeClass: 'bg-red-100 text-red-800',
+                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+                    };
+                default:
+                    return {
+                        badgeClass: 'bg-gray-100 text-gray-800',
+                        icon: `<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>`
+                    };
+            }
+        }
+
+        // Reseta o formulário
+        function resetForm() {
+            form.reset();
+            currentEditId = null;
+            formTitle.textContent = 'Adicionar Agendamento';
+            saveButton.textContent = 'Salvar';
+            cancelEditButton.classList.add('hidden');
+            document.getElementById('current-edit-id').value = '';
+            document.getElementById('samplesRequested').checked = false;
+            dateStartInput.value = '';
+            dateEndInput.value = '';
+            dateEndInput.min = ''; // Limpa a restrição 'min'
+            document.getElementById('isTravel').checked = false;
+        }
+
+        // --- Funções de Modal ---
+
+        function openFormModal() {
+            resetForm();
+            formModal.classList.remove('hidden');
+        }
+
+        function closeFormModal() {
+            formModal.classList.add('hidden');
+            resetForm(); // Garante que o formulário seja resetado ao fechar
+        }
+
+        function openDetailsModal() {
+            dayDetailsModal.classList.remove('hidden');
+        }
+
+        function closeDetailsModal() {
+            dayDetailsModal.classList.add('hidden');
+        }
+
+        // --- Funções do Calendário e Dashboard ---
+
+        /**
+         * NOVO: Atualiza o dashboard com estatísticas do mês
+         */
+        function updateDashboard(assignments, currentDate) {
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const currentMonthString = `${year}-${month}`;
+
+            // Filtra agendamentos que *começam* no mês corrente
+            const monthAssignments = assignments.filter(a => 
+                a.dateStart && a.dateStart.substring(0, 7) === currentMonthString
+            );
+
+            // 1. Total de Agendamentos
+            summaryTotal.textContent = monthAssignments.length;
+
+            // 2. Total de Viagens
+            const totalViagens = monthAssignments.filter(a => a.isTravel).length;
+            summaryTravels.textContent = totalViagens;
+
+            // 3. Técnico do Mês
+            if (monthAssignments.length === 0) {
+                summaryMvp.textContent = 'N/A';
+                return;
+            }
+
+            const techCounts = monthAssignments.reduce((acc, a) => {
+                acc[a.technicianName] = (acc[a.technicianName] || 0) + 1;
+                return acc;
+            }, {});
+
+            const mvp = Object.entries(techCounts).sort((a, b) => b[1] - a[1])[0];
+            summaryMvp.textContent = mvp[0]; // Nome do técnico
+            summaryMvp.title = `${mvp[0]} com ${mvp[1]} agendamento(s)`; // Dica
+        }
+
+        function generateCalendar(date) {
+            calendarGridElement.innerHTML = '';
+            const today = getTodayDateString();
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            
+            currentMonthYearElement.textContent = new Date(year, month).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // --- NOVO: Atribui cores aos técnicos do mês ---
+            techColorMap.clear();
+            const currentMonthString = `${year}-${String(month + 1).padStart(2, '0')}`;
+            const monthAssignments = allAssignments.filter(a => a.dateStart && a.dateStart.substring(0, 7) === currentMonthString);
+            const uniqueTechs = [...new Set(monthAssignments.map(a => a.technicianName))];
+            uniqueTechs.forEach((name, index) => {
+                techColorMap.set(name, techColors[index % techColors.length]);
+            });
+            // --- Fim da atribuição de cores ---
+
+            // Dias vazios
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                calendarGridElement.innerHTML += `<div class="calendar-day empty-day"></div>`;
+            }
+
+            // Dias do mês
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // LÓGICA ATUALIZADA: Verifica se o dia está DENTRO da faixa de datas
+                const assignmentsForDay = allAssignments.filter(a => 
+                    a.dateStart && a.dateEnd && 
+                    dateString >= a.dateStart && dateString <= a.dateEnd
+                );
+
+                const dayElement = document.createElement('div');
+                dayElement.className = `calendar-day text-text-dark relative`;
+                if (dateString === today) dayElement.classList.add('today');
+                if (assignmentsForDay.length > 0) dayElement.classList.add('has-assignments');
+
+                // NOVO: Gera os nomes dos técnicos E clientes para o dia
+                const item = assignmentsForDay[0]; // Pega o primeiro item
+                let assignmentsListHTML = '';
+                
+                if (item) {
+                    let color = techColorMap.get(item.technicianName) || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
+                    const travelIcon = item.isTravel ? '✈️' : '';
+                    
+                    // NOVO: Se o status for 'Cancelado', sobrescreve a cor para vermelho
+                    if (item.status === 'Cancelado') {
+                        color = { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' };
+                    }
+                    
+                    assignmentsListHTML = `
+                        <div class="text-xs text-left px-1.5 py-1 rounded border ${color.bg} ${color.border}" 
+                             title="${item.technicianName} - ${item.clientName}">
+                            <div class="font-bold truncate ${color.text}">
+                                ${travelIcon} ${item.technicianName}
+                            </div>
+                            <div class="truncate ${color.text} opacity-75">
+                                ${item.status === 'Cancelado' ? 'CANCELADO' : item.clientName}
+                            </div>
+                        </div>`;
+                }
+                
+                const moreAssignmentsHTML = assignmentsForDay.length > 1 
+                    ? `<div class="text-xs text-text-light font-semibold mt-1">+ ${assignmentsForDay.length - 1} mais</div>` 
+                    : '';
+                
+                dayElement.innerHTML = `
+                    <span class="font-semibold text-lg">${day}</span>
+                    <div class="mt-1 flex flex-col gap-0.5">
+                        ${assignmentsListHTML}
+                        ${moreAssignmentsHTML}
+                    </div>
+                `;
+                dayElement.dataset.date = dateString;
+                dayElement.addEventListener('click', () => showDayDetails(dateString, assignmentsForDay));
+                calendarGridElement.appendChild(dayElement);
+            }
+        }
+
+        // Mostra o modal com detalhes do dia
+        function showDayDetails(dateString, assignmentsForDay) {
+            modalDateTitle.textContent = `Agendamentos para ${formatDisplayDate(dateString)}`;
+            modalAssignmentsList.innerHTML = '';
+
+            if (assignmentsForDay.length === 0) {
+                modalAssignmentsList.innerHTML = '<p class="text-text-light italic">Nenhum agendamento para esta data.</p>';
+            } else {
+                assignmentsForDay.sort((a, b) => a.technicianName.localeCompare(b.technicianName));
+
+                assignmentsForDay.forEach(item => {
+                    const statusInfo = getStatusInfo(item.status);
+                    
+                    // LÓGICA ATUALIZADA: Adiciona texto "Amostra Solicitada?"
+                    const samplesDisplay = item.samplesRequested ? 
+                        `<span class="text-green-500 text-lg" title="Sim">👍</span>` : 
+                        `<span class="text-red-500 text-lg" title="Não">👎</span>`;
+
+                    const samplesHTML = `
+                        <span class="ml-3 text-sm font-normal text-text-light">
+                            | Amostra Solicitada? ${samplesDisplay}
+                        </span>
+                    `;
+                    
+                    const travelIcon = item.isTravel ? `<span class="ml-2" title="Em viagem">✈️</span>` : '';
+                    
+                    // NOVO: Pega a cor do técnico
+                    let color = techColorMap.get(item.technicianName) || { bg: 'bg-gray-50', text: 'text-gray-800', border: 'border-gray-300' };
+
+                    // NOVO: Se estiver cancelado, sobrescreve para vermelho
+                    if (item.status === 'Cancelado') {
+                        color = { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-400' };
+                    }
+
+                    // Calcular duração
+                    let durationText = '(1 dia)';
+                    if (item.dateStart && item.dateEnd) {
+                        try {
+                            const d1 = new Date(item.dateStart + 'T00:00:00');
+                            const d2 = new Date(item.dateEnd + 'T00:00:00');
+                            const diffTime = Math.abs(d2 - d1);
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para ser inclusivo
+                            durationText = `(${diffDays} ${diffDays > 1 ? 'dias' : 'dia'})`;
+                        } catch(e) {}
+                    }
+                    
+                    const dateRange = (item.dateStart === item.dateEnd) ? 
+                        formatDisplayDate(item.dateStart) : 
+                        `De ${formatDisplayDate(item.dateStart)} até ${formatDisplayDate(item.dateEnd)}`;
+
+                    // NOVO: Lógica para botões de Cancelar/Reativar
+                    let quickActionButton = '';
+                    if (item.status === 'Cancelado') {
+                        quickActionButton = `
+                            <button data-id="${item.id}" class="reactivate-btn-modal flex-1 bg-green-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-green-600 transition">
+                                Reativar (Agendado)
+                            </button>`;
+                    } else {
+                        quickActionButton = `
+                            <button data-id="${item.id}" class="cancel-btn-modal flex-1 bg-gray-400 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-gray-500 transition">
+                                Marcar como Cancelado
+                            </button>`;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = `bg-gray-50 p-4 rounded-lg shadow-sm mb-3 border-l-4 ${color.border}`; // Usa a cor do técnico
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <h4 class="text-lg font-bold ${color.text}">${item.technicianName} ${travelIcon}</h4>
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusInfo.badgeClass}">
+                                ${statusInfo.icon} ${item.status}
+                            </span>
+                        </div>
+                        <p class="text-md font-medium text-text-dark flex items-center">
+                            <span>${item.clientName}</span>
+                            ${samplesHTML}
+                        </p>
+                        <p class="text-sm text-text-light mt-2"><strong>Ação:</strong> ${item.action}</p>
+                        <p class="text-sm text-text-light"><strong>Região:</strong> ${item.region}</p>
+                        <p class="text-sm text-text-light"><strong>Período:</strong> ${dateRange} <span class="font-medium">${durationText}</span></p>
+                        <div class="flex gap-2 mt-3 pt-3 border-t border-border-color">
+                            <button data-id="${item.id}" class="edit-btn-modal flex-1 bg-yellow-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-yellow-600 transition">
+                                Editar
+                            </button>
+                            ${quickActionButton}
+                            <button data-id="${item.id}" class="delete-btn-modal flex-1 bg-red-500 text-white text-sm py-1 px-3 rounded-md font-medium hover:bg-red-600 transition">
+                                Excluir
+                            </button>
+                        </div>
+                    `;
+                    modalAssignmentsList.appendChild(card);
+                });
+                
+                // Adiciona ouvintes para os botões do modal
+                document.querySelectorAll('.edit-btn-modal').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        handleEditClick(e);
+                        closeDetailsModal(); // Fecha modal de detalhes
+                        openFormModal();     // Abre modal de formulário
+                    });
+                });
+                document.querySelectorAll('.delete-btn-modal').forEach(btn => {
+                    btn.addEventListener('click', handleDeleteClick);
+                });
+                // NOVO: Listeners para os botões de ação rápida
+                document.querySelectorAll('.cancel-btn-modal').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleQuickStatusChange(e, 'Cancelado'));
+                });
+                document.querySelectorAll('.reactivate-btn-modal').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleQuickStatusChange(e, 'Agendado'));
+                });
+            }
+
+            openDetailsModal();
+        }
+
+        /** NOVO: Atualiza o painel de "Próximos Agendamentos" */
+        function updateUpcomingEvents(assignments) {
+            const todayString = getTodayDateString();
+            const upcomingListElement = document.getElementById('upcoming-events-list');
+            
+            // Filtra por agendamentos futuros (data de início >= hoje) e não cancelados
+            const upcoming = assignments
+                .filter(a => a.dateStart >= todayString && a.status !== 'Cancelado')
+                .sort((a, b) => a.dateStart.localeCompare(b.dateStart)); // Ordena do mais próximo para o mais distante
+
+            upcomingListElement.innerHTML = ''; // Limpa a lista
+
+            if (upcoming.length === 0) {
+                upcomingListElement.innerHTML = `<p class="text-text-light italic" id="upcoming-placeholder">Nenhum agendamento futuro encontrado.</p>`;
+                return;
+            }
+
+            // Limita a 5 itens
+            upcoming.slice(0, 5).forEach(item => {
+                const daysLeft = getDaysLeft(item.dateStart);
+                let countdownText = '';
+                let countdownColor = 'text-text-light';
+
+                if (daysLeft === 0) {
+                    countdownText = "É hoje!";
+                    countdownColor = 'text-green-600 font-bold';
+                } else if (daysLeft === 1) {
+                    countdownText = "Falta 1 dia";
+                    countdownColor = 'text-yellow-600 font-semibold';
+                } else if (daysLeft > 1) {
+                    countdownText = `Faltam ${daysLeft} dias`;
+                    if (daysLeft <= 7) {
+                        countdownColor = 'text-yellow-600 font-semibold';
+                    }
+                } else {
+                    // Se por algum motivo for negativo, não mostra
+                    return; 
+                }
+
+                // Pega a cor do técnico (se já tiver sido atribuída pelo calendário)
+                const color = techColorMap.get(item.technicianName) || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' };
+
+                const eventHTML = `
+                    <div class="p-3 rounded-md border ${color.border} ${color.bg} ${color.text} shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class_name="font-bold">${item.technicianName}</span>
+                            <span class="font-bold text-sm ${countdownColor}">${countdownText}</span>
+                        </div>
+                        <div class="text-sm opacity-80">
+                            ${item.clientName} (Início: ${formatDisplayDate(item.dateStart)})
+                        </div>
+                    </div>
+                `;
+                upcomingListElement.innerHTML += eventHTML;
+            });
+        }
+
+
+        // --- Funções CRUD ---
+
+        async function handleSave(e) {
+            e.preventDefault();
+            
+            const assignmentData = {
+                technicianName: document.getElementById('technicianName').value,
+                clientName: document.getElementById('clientName').value,
+                action: document.getElementById('action').value,
+                region: document.getElementById('region').value,
+                dateStart: dateStartInput.value,
+                dateEnd: dateEndInput.value,
+                status: document.getElementById('status').value,
+                samplesRequested: document.getElementById('samplesRequested').checked,
+                isTravel: document.getElementById('isTravel').checked,
+            };
+
+            if (!assignmentData.technicianName || !assignmentData.clientName || !assignmentData.dateStart || !assignmentData.dateEnd) {
+                showToast("Por favor, preencha Técnico, Cliente, Data de Início e Data de Fim.", true);
+                return;
+            }
+
+            if (assignmentData.dateEnd < assignmentData.dateStart) {
+                showToast("A data de fim não pode ser anterior à data de início.", true);
+                return;
+            }
+
+            try {
+                if (currentEditId) {
+                    const docRef = doc(db, assignmentsColPath, currentEditId);
+                    await updateDoc(docRef, assignmentData);
+                    showToast("Agendamento atualizado!");
+                } else {
+                    await addDoc(assignmentsCollection, assignmentData);
+                    showToast("Agendamento adicionado!");
+                }
+                closeFormModal();
+            } catch (error) {
+                console.error("Erro ao salvar: ", error);
+                showToast("Ocorreu um erro ao salvar.", true);
+            }
+        }
+
+        // NOVO: Função para Ação Rápida de Cancelar/Reativar (Sem confirm/alert)
+        async function handleQuickStatusChange(e, newStatus) {
+            const id = e.target.dataset.id;
+            const actionText = newStatus === 'Cancelado' ? 'cancelado' : 'reativado';
+
+            try {
+                const docRef = doc(db, assignmentsColPath, id);
+                await updateDoc(docRef, { status: newStatus });
+                showToast(`Agendamento ${actionText} com sucesso!`);
+                closeDetailsModal();
+            } catch (error) {
+                console.error(`Erro ao ${actionText}: `, error);
+                showToast(`Ocorreu um erro ao ${actionText} o agendamento.`, true);
+            }
+        }
+
+        function handleEditClick(e) {
+            const id = e.target.dataset.id;
+            const item = allAssignments.find(item => item.id === id);
+
+            if (!item) return;
+
+            document.getElementById('technicianName').value = item.technicianName;
+            document.getElementById('clientName').value = item.clientName;
+            document.getElementById('action').value = item.action;
+            document.getElementById('region').value = item.region;
+            dateStartInput.value = item.dateStart;
+            dateEndInput.value = item.dateEnd;
+            dateEndInput.min = item.dateStart; // Aplica a restrição
+            document.getElementById('status').value = item.status;
+            document.getElementById('samplesRequested').checked = item.samplesRequested || false;
+            document.getElementById('isTravel').checked = item.isTravel || false;
+            
+            currentEditId = id;
+            
+            formTitle.textContent = 'Editar Agendamento';
+            saveButton.textContent = 'Atualizar';
+            cancelEditButton.classList.remove('hidden');
+        }
+
+        async function handleDeleteClick(e) {
+            const id = e.target.dataset.id;
+            
+            // REMOVIDO: confirm()
+            try {
+                const docRef = doc(db, assignmentsColPath, id);
+                await deleteDoc(docRef);
+                showToast("Agendamento excluído!");
+                closeDetailsModal();
+            } catch (error) {
+                console.error("Erro ao excluir: ", error);
+                showToast("Ocorreu um erro ao excluir.", true);
+            }
+        }
+
+        // --- Firebase Setup ---
+
+        async function setupFirebase() {
+            try {
+                // setLogLevel('Debug');
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                assignmentsCollection = collection(db, assignmentsColPath);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        authStatus.textContent = `Conectado (ID: ${userId.substring(0, 6)}...)`;
+                        authStatus.classList.add('text-green-600');
+                        loadAssignments();
+                    } else {
+                        authStatus.textContent = 'Usuário não autenticado.';
+                        authStatus.classList.add('text-red-600');
+                    }
+                });
+
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+            } catch (error) {
+                console.error("Falha ao inicializar o Firebase: ", error);
+                authStatus.textContent = 'Falha ao conectar.';
+                authStatus.classList.add('text-red-600');
+            }
+        }
+
+        // Carrega dados em tempo real
+        function loadAssignments() {
+            loader.classList.remove('hidden');
+            loadingText.classList.remove('hidden');
+
+            onSnapshot(query(assignmentsCollection), (snapshot) => {
+                allAssignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                loader.classList.add('hidden');
+                loadingText.classList.add('hidden');
+                // Atualiza o calendário e o dashboard
+                generateCalendar(currentCalendarDate);
+                updateDashboard(allAssignments, currentCalendarDate);
+                
+                // NOVO: Atualiza a contagem regressiva
+                updateUpcomingEvents(allAssignments);
+            
+            }, (error) => {
+                console.error("Erro ao carregar dados: ", error);
+                loader.classList.add('hidden');
+                loadingText.classList.add('hidden');
+                showToast('Erro ao carregar dados.', true);
+            });
+        }
+        
+        // --- Ponto de Entrada (Main) ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFirebase();
+            generateCalendar(currentCalendarDate);
+            updateDashboard(allAssignments, currentCalendarDate); // Atualiza o dashboard na carga inicial
+
+            // Navegação do Calendário
+            prevMonthButton.addEventListener('click', () => {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+                generateCalendar(currentCalendarDate);
+                updateDashboard(allAssignments, currentCalendarDate); // Atualiza o dashboard ao mudar de mês
+                // Não é preciso chamar updateUpcomingEvents aqui, pois ele é global (não depende do mês)
+            });
+
+            nextMonthButton.addEventListener('click', () => {
+                currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+                generateCalendar(currentCalendarDate);
+                updateDashboard(allAssignments, currentCalendarDate); // Atualiza o dashboard ao mudar de mês
+            });
+
+            // Listeners dos Modais
+            openAddModalButton.addEventListener('click', openFormModal);
+            closeFormModalButton.addEventListener('click', closeFormModal);
+            formModalOverlay.addEventListener('click', closeFormModal);
+            
+            closeDetailsModalButton.addEventListener('click', closeDetailsModal);
+            detailsModalOverlay.addEventListener('click', closeDetailsModal);
+
+            // Formulário
+            form.addEventListener('submit', handleSave);
+            cancelEditButton.addEventListener('click', resetForm);
+            
+            // Validação de Data
+            dateStartInput.addEventListener('change', (e) => { 
+                dateEndInput.min = e.target.value; 
+                if (dateEndInput.value && dateEndInput.value < e.target.value) {
+                    dateEndInput.value = e.target.value;
+                }
+            });
+            dateEndInput.addEventListener('change', (e) => {
+                if (!dateStartInput.value) {
+                    dateStartInput.value = e.target.value;
+                    dateEndInput.min = e.target.value;
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
