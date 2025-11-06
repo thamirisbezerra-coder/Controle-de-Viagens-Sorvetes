@@ -647,6 +647,16 @@
                     const isCancelled = a.status === 'Cancelado';
                     const travelIcon = a.isTravel ? '✈️' : '';
                     
+                    // Lógica para o status da amostra (NOVO)
+                    let sampleStatusHtml = '';
+                    if (!isCancelled) { // Só mostra o status da amostra se NÃO estiver cancelado
+                        if (a.samplesRequested) {
+                            sampleStatusHtml = `<span class="block text-xs italic text-green-700">Amostra Solicitada</span>`;
+                        } else {
+                            sampleStatusHtml = `<span class="block text-xs italic text-red-700">Amostra Pendente</span>`;
+                        }
+                    }
+                    
                     const badgeClass = isCancelled 
                         ? 'cancelled' 
                         : `${techColor.bg} ${techColor.border} ${techColor.text}`;
@@ -655,6 +665,7 @@
                         <div class="assignment-badge ${badgeClass}" title="${a.technicianName} - ${a.clientName} ${travelIcon}">
                             <strong class="font-semibold">${a.technicianName} ${travelIcon}</strong>
                             <span class="block text-xs opacity-75">${isCancelled ? 'CANCELADO' : a.clientName}</span>
+                            ${sampleStatusHtml} <!-- ADICIONADO AQUI -->
                         </div>
                     `;
                 });
@@ -990,3 +1001,4 @@
     </script>
 </body>
 </html>
+
